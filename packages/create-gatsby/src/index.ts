@@ -400,7 +400,7 @@ ${c.bold(`Thanks! Here's what we'll now do:`)}
   }
 
   await initStarter(
-    DEFAULT_STARTERS[data.language],
+    DEFAULT_STARTERS[data.language || `js`],
     data.project,
     packages.map(removeKey),
     siteName
