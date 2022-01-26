@@ -1,5 +1,6 @@
 import Enquirer from "enquirer"
 import cmses from "./cmses.json"
+import language from "./language.json"
 import styles from "./styles.json"
 import features from "./features.json"
 import { initStarter, getPackageManager, gitSetup } from "./init-starter"
@@ -32,19 +33,23 @@ const w = (input: string): string => (process.platform === `win32` ? `` : input)
 const INVALID_FILENAMES = /[<>:"/\\|?*\u0000-\u001F]/g
 const INVALID_WINDOWS = /^(con|prn|aux|nul|com\d|lpt\d)$/i
 
-const DEFAULT_STARTER = `https://github.com/gatsbyjs/gatsby-starter-minimal.git`
+const DEFAULT_STARTERS: Record<keyof typeof language, string> = {
+  js: `https://github.com/gatsbyjs/gatsby-starter-minimal.git`,
+  ts: `https://github.com/gatsbyjs/gatsby-starter-minimal-ts.git`, // TODO - Create
+}
 
 const makeChoices = (
   options: Record<string, { message: string; dependencies?: Array<string> }>,
-  multi = false
+  mustSelect = false
 ): Array<{ message: string; name: string; disabled?: boolean }> => {
   const entries = Object.entries(options).map(([name, message]) => {
     return { name, message: message.message }
   })
 
-  if (multi) {
+  if (mustSelect) {
     return entries
   }
+
   const none = { name: `none`, message: `No (or I'll add it later)` }
   const divider = { name: `–`, role: `separator`, message: `–` }
 
@@ -86,6 +91,13 @@ export const questions = (initialFolderName: string, skip: boolean): any => [
   },
   {
     type: `selectinput`,
+    name: `language`,
+    message: `Will you be using JavaScript or TypeScript?`,
+    hint: `(Single choice) Arrow keys to move, enter to confirm`,
+    choices: makeChoices(language, true),
+  },
+  {
+    type: `selectinput`,
     name: `cms`,
     message: `Will you be using a CMS?`,
     hint: `(Single choice) Arrow keys to move, enter to confirm`,
@@ -109,6 +121,7 @@ export const questions = (initialFolderName: string, skip: boolean): any => [
 interface IAnswers {
   name: string
   project: string
+  language: keyof typeof language
   styling?: keyof typeof styles
   cms?: keyof typeof cmses
   features?: Array<keyof typeof features>
@@ -212,6 +225,10 @@ ${center(c.blueBright.bold.underline(`Welcome to Gatsby!`))}
 
   trackCli(`CREATE_GATSBY_SELECT_OPTION`, {
     name: `project_name`,
+    valueString: sha256(data.project),
+  })
+  trackCli(`CREATE_GATSBY_SELECT_OPTION`, {
+    name: `LANGUAGE`,
     valueString: sha256(data.project),
   })
   trackCli(`CREATE_GATSBY_SELECT_OPTION`, {
@@ -339,7 +356,7 @@ ${c.bold(`Thanks! Here's what we'll now do:`)}
   }
 
   await initStarter(
-    DEFAULT_STARTER,
+    DEFAULT_STARTERS[data.language],
     data.project,
     packages.map(removeKey),
     siteName
