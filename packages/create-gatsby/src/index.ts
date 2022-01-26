@@ -157,12 +157,29 @@ export type PluginConfigMap = Record<string, Record<string, unknown>>
 const removeKey = (plugin: string): string => plugin.split(`:`)[0]
 
 export async function run(): Promise<void> {
-  const [flag, siteDirectory] = process.argv.slice(2)
-
-  let yesFlag = false
-  if (flag === `-y`) {
-    yesFlag = true
-  }
+  // Do not make arguments positional
+  const { flags, siteDirectory } = process.argv.slice(2).reduce(
+    (sortedArgs, arg) => {
+      switch (arg) {
+        case `-y`:
+          sortedArgs.flags.yes = true
+          break
+        case `-tsc`:
+          sortedArgs.flags.ts = true
+          break
+        default:
+          sortedArgs.siteDirectory = arg
+      }
+      return sortedArgs
+    },
+    {
+      flags: {
+        yes: false,
+        ts: false,
+      },
+      siteDirectory: ``,
+    }
+  )
 
   trackCli(`CREATE_GATSBY_START`)
 
@@ -180,7 +197,7 @@ ${center(c.blueBright.bold.underline(`Welcome to Gatsby!`))}
 `
   )
 
-  if (!yesFlag) {
+  if (!flags.yes) {
     reporter.info(
       wrap(
         `This command will generate a new Gatsby site for you in ${c.bold(
@@ -199,7 +216,7 @@ ${center(c.blueBright.bold.underline(`Welcome to Gatsby!`))}
 
   let data
   let siteName
-  if (!yesFlag) {
+  if (!flags.yes) {
     ;({ name: siteName } = await enquirer.prompt({
       type: `textinput`,
       name: `name`,
@@ -208,7 +225,7 @@ ${center(c.blueBright.bold.underline(`Welcome to Gatsby!`))}
       format: (value: string): string => c.cyan(value),
     } as any))
 
-    data = await enquirer.prompt(questions(makeNpmSafe(siteName), yesFlag))
+    data = await enquirer.prompt(questions(makeNpmSafe(siteName), flags.yes))
   } else {
     const warn = await validateProjectName(siteDirectory)
     if (typeof warn === `string`) {
@@ -217,7 +234,7 @@ ${center(c.blueBright.bold.underline(`Welcome to Gatsby!`))}
     }
     siteName = siteDirectory
     data = await enquirer.prompt(
-      questions(makeNpmSafe(siteDirectory), yesFlag)[0]
+      questions(makeNpmSafe(siteDirectory), flags.yes)[0]
     )
   }
 
@@ -331,7 +348,7 @@ ${center(c.blueBright.bold.underline(`Welcome to Gatsby!`))}
 
     trackCli(`CREATE_GATSBY_SET_PLUGINS_STOP`)
   }
-  if (!yesFlag) {
+  if (!flags.yes) {
     reporter.info(`
 
 ${c.bold(`Thanks! Here's what we'll now do:`)}
