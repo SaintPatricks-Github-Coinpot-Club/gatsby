@@ -156,9 +156,21 @@ export type PluginConfigMap = Record<string, Record<string, unknown>>
 
 const removeKey = (plugin: string): string => plugin.split(`:`)[0]
 
-export async function run(): Promise<void> {
-  // Do not make arguments positional
-  const { flags, siteDirectory } = process.argv.slice(2).reduce(
+interface IArgs {
+  flags: {
+    yes: boolean
+    ts: boolean
+  }
+  siteDirectory: string
+}
+
+/**
+ * Parse arguments without considering position. Both cases should work the same:
+ * - `npm init gatsby hello-world -y`
+ * - `npm init gatsby -y hello-world`
+ */
+export function parseArgs(args: Array<string>): IArgs {
+  const { flags, siteDirectory } = args.reduce(
     (sortedArgs, arg) => {
       switch (arg) {
         case `-y`:
@@ -168,6 +180,12 @@ export async function run(): Promise<void> {
           sortedArgs.flags.ts = true
           break
         default:
+          if (arg.startsWith(`-`)) {
+            reporter.warn(
+              c.yellow(`Found unknown argument "${arg}", ignoring.`)
+            )
+            break
+          }
           sortedArgs.siteDirectory = arg
       }
       return sortedArgs
@@ -180,6 +198,15 @@ export async function run(): Promise<void> {
       siteDirectory: ``,
     }
   )
+
+  return {
+    flags,
+    siteDirectory,
+  }
+}
+
+export async function run(): Promise<void> {
+  const { flags, siteDirectory } = parseArgs(process.argv.slice(2))
 
   trackCli(`CREATE_GATSBY_START`)
 
