@@ -1,9 +1,9 @@
 import { run } from "../index"
 import { initStarter } from "../init-starter"
-import { reporter } from "../reporter"
+import { reporter } from "../utils/reporter"
 
 jest.mock(`../init-starter`)
-jest.mock(`../reporter`)
+jest.mock(`../utils/reporter`)
 
 describe(`run`, () => {
   describe(`questions`, () => {

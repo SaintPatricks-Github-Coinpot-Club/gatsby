@@ -1,6 +1,13 @@
-import c from "ansi-colors"
+import colors from "ansi-colors"
 import { reporter } from "./reporter"
-import type { IArgs } from "./index"
+
+interface IArgs {
+  flags: {
+    yes: boolean
+    ts: boolean
+  }
+  siteDirectory: string
+}
 
 /**
  * Parse arguments without considering position. Both cases should work the same:
@@ -19,9 +26,7 @@ export function parseArgs(args: Array<string>): IArgs {
           break
         default:
           if (arg.startsWith(`-`)) {
-            reporter.warn(
-              c.yellow(`Found unknown argument "${arg}", ignoring.`)
-            )
+            reporter.warn(`Found unknown argument "${arg}", ignoring.`)
             break
           }
           sortedArgs.siteDirectory = arg

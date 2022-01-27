@@ -1,7 +1,7 @@
-import { parseArgs } from "../parse-args"
-import { reporter } from "../reporter"
+import { parseArgs } from "../../utils/parse-args"
+import { reporter } from "../../utils/reporter"
 
-jest.mock(`../reporter`)
+jest.mock(`../../utils/reporter`)
 
 describe(`parseArgs`, () => {
   it(`should parse without flags and dir`, () => {

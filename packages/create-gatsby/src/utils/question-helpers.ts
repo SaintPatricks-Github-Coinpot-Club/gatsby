@@ -1,10 +1,10 @@
 import fs from "fs"
 import path from "path"
-import cmses from "./cmses.json"
-import language from "./language.json"
-import styles from "./styles.json"
-import features from "./features.json"
-import c from "ansi-colors"
+import cmses from "../questions/cmses.json"
+import language from "../questions/language.json"
+import styles from "../questions/styles.json"
+import features from "../questions/features.json"
+import colors from "ansi-colors"
 
 // eslint-disable-next-line no-control-regex
 const INVALID_FILENAMES = /[<>:"/\\|?*\u0000-\u001F]/g
@@ -60,7 +60,7 @@ export const generateQuestions = (
     hint: path.basename(process.cwd()),
     separator: `/`,
     initial: initialFolderName,
-    format: (value: string): string => c.cyan(value),
+    format: (value: string): string => colors.cyan(value),
     validate: validateProjectName,
     skip,
   },

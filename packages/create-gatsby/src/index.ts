@@ -1,34 +1,27 @@
 import Enquirer from "enquirer"
-import cmses from "./cmses.json"
-import language from "./language.json"
-import styles from "./styles.json"
-import features from "./features.json"
+import cmses from "./questions/cmses.json"
+import language from "./questions/language.json"
+import styles from "./questions/styles.json"
+import features from "./questions/features.json"
 import { initStarter, getPackageManager, gitSetup } from "./init-starter"
 import { installPlugins } from "./install-plugins"
-import c from "ansi-colors"
+import colors from "ansi-colors"
 import path from "path"
 import { plugin } from "./components/plugin"
 import { makePluginConfigQuestions } from "./plugin-options-form"
 import { center, wrap } from "./components/utils"
 import { stripIndent } from "common-tags"
 import { trackCli } from "./tracking"
-import crypto from "crypto"
-import { reporter } from "./reporter"
-import { setSiteMetadata } from "./site-metadata"
-import { makeNpmSafe } from "./utils"
-import { parseArgs } from "./parse-args"
-import { validateProjectName, generateQuestions } from "./questions"
-
-const sha256 = (str: string): string =>
-  crypto.createHash(`sha256`).update(str).digest(`hex`)
-
-const md5 = (str: string): string =>
-  crypto.createHash(`md5`).update(str).digest(`hex`)
-
-/**
- * Hide string on windows (for emojis)
- */
-const w = (input: string): string => (process.platform === `win32` ? `` : input)
+import { reporter } from "./utils/reporter"
+import { setSiteMetadata } from "./utils/site-metadata"
+import { makeNpmSafe } from "./utils/make-npm-safe"
+import { parseArgs } from "./utils/parse-args"
+import {
+  validateProjectName,
+  generateQuestions,
+} from "./utils/question-helpers"
+import { sha256, md5 } from "./utils/hash"
+import { maybeUseEmoji } from "./utils/emoji"
 
 const DEFAULT_STARTERS: Record<keyof typeof language, string> = {
   js: `https://github.com/gatsbyjs/gatsby-starter-minimal.git`,
@@ -71,14 +64,6 @@ export type PluginMap = Record<string, IPluginEntry>
 
 export type PluginConfigMap = Record<string, Record<string, unknown>>
 
-export interface IArgs {
-  flags: {
-    yes: boolean
-    ts: boolean
-  }
-  siteDirectory: string
-}
-
 export async function run(): Promise<void> {
   const { flags, siteDirectory } = parseArgs(process.argv.slice(2))
 
@@ -86,13 +71,13 @@ export async function run(): Promise<void> {
 
   const { version } = require(`../package.json`)
 
-  reporter.info(c.grey(`create-gatsby version ${version}`))
+  reporter.info(colors.grey(`create-gatsby version ${version}`))
 
   reporter.info(
     `
 
 
-${center(c.blueBright.bold.underline(`Welcome to Gatsby!`))}
+${center(colors.blueBright.bold.underline(`Welcome to Gatsby!`))}
 
 
 `
@@ -101,9 +86,9 @@ ${center(c.blueBright.bold.underline(`Welcome to Gatsby!`))}
   if (!flags.yes) {
     reporter.info(
       wrap(
-        `This command will generate a new Gatsby site for you in ${c.bold(
+        `This command will generate a new Gatsby site for you in ${colors.bold(
           process.cwd()
-        )} with the setup you select. ${c.white.bold(
+        )} with the setup you select. ${colors.white.bold(
           `Let's answer some questions:\n\n`
         )}`,
         process.stdout.columns
@@ -123,7 +108,7 @@ ${center(c.blueBright.bold.underline(`Welcome to Gatsby!`))}
       name: `name`,
       message: `What would you like to call your site?`,
       initial: `My Gatsby Site`,
-      format: (value: string): string => c.cyan(value),
+      format: (value: string): string => colors.cyan(value),
     } as any))
 
     data = await enquirer.prompt(
@@ -165,9 +150,9 @@ ${center(c.blueBright.bold.underline(`Welcome to Gatsby!`))}
   })
 
   const messages: Array<string> = [
-    `${w(`🛠  `)}Create a new Gatsby site in the folder ${c.magenta(
-      data.project
-    )}`,
+    `${maybeUseEmoji(
+      `🛠  `
+    )}Create a new Gatsby site in the folder ${colors.magenta(data.project)}`,
   ]
 
   const plugins: Array<string> = []
@@ -176,7 +161,9 @@ ${center(c.blueBright.bold.underline(`Welcome to Gatsby!`))}
 
   if (data.cms && data.cms !== `none`) {
     messages.push(
-      `${w(`📚 `)}Install and configure the plugin for ${c.magenta(
+      `${maybeUseEmoji(
+        `📚 `
+      )}Install and configure the plugin for ${colors.magenta(
         cmses[data.cms].message
       )}`
     )
@@ -192,7 +179,7 @@ ${center(c.blueBright.bold.underline(`Welcome to Gatsby!`))}
 
   if (data.styling && data.styling !== `none`) {
     messages.push(
-      `${w(`🎨 `)}Get you set up to use ${c.magenta(
+      `${maybeUseEmoji(`🎨 `)}Get you set up to use ${colors.magenta(
         styles[data.styling].message
       )} for styling your site`
     )
@@ -209,8 +196,8 @@ ${center(c.blueBright.bold.underline(`Welcome to Gatsby!`))}
 
   if (data.features?.length) {
     messages.push(
-      `${w(`🔌 `)}Install ${data.features
-        ?.map((feat: string) => c.magenta(feat))
+      `${maybeUseEmoji(`🔌 `)}Install ${data.features
+        ?.map((feat: string) => colors.magenta(feat))
         .join(`, `)}`
     )
     plugins.push(...data.features)
@@ -254,7 +241,7 @@ ${center(c.blueBright.bold.underline(`Welcome to Gatsby!`))}
   if (!flags.yes) {
     reporter.info(`
 
-${c.bold(`Thanks! Here's what we'll now do:`)}
+${colors.bold(`Thanks! Here's what we'll now do:`)}
 
     ${messages.join(`\n    `)}
   `)
@@ -264,7 +251,7 @@ ${c.bold(`Thanks! Here's what we'll now do:`)}
       name: `confirm`,
       initial: `Yes`,
       message: `Shall we do this?`,
-      format: value => (value ? c.greenBright(`Yes`) : c.red(`No`)),
+      format: value => (value ? colors.greenBright(`Yes`) : colors.red(`No`)),
     })
 
     if (!confirm) {
@@ -282,12 +269,12 @@ ${c.bold(`Thanks! Here's what we'll now do:`)}
     siteName
   )
 
-  reporter.success(`Created site in ${c.green(data.project)}`)
+  reporter.success(`Created site in ${colors.green(data.project)}`)
 
   const fullPath = path.resolve(data.project)
 
   if (plugins.length) {
-    reporter.info(`${w(`🔌 `)}Setting-up plugins...`)
+    reporter.info(`${maybeUseEmoji(`🔌 `)}Setting-up plugins...`)
     await installPlugins(plugins, pluginConfig, fullPath, [])
   }
   await setSiteMetadata(fullPath, `title`, siteName)
@@ -299,22 +286,22 @@ ${c.bold(`Thanks! Here's what we'll now do:`)}
 
   reporter.info(
     stripIndent`
-    ${w(`🎉  `)}Your new Gatsby site ${c.bold(
+    ${maybeUseEmoji(`🎉  `)}Your new Gatsby site ${colors.bold(
       siteName
     )} has been successfully created
-    at ${c.bold(fullPath)}.
+    at ${colors.bold(fullPath)}.
     `
   )
   reporter.info(`Start by going to the directory with\n
-  ${c.magenta(`cd ${data.project}`)}
+  ${colors.magenta(`cd ${data.project}`)}
   `)
 
   reporter.info(`Start the local development server with\n
-  ${c.magenta(`${runCommand} develop`)}
+  ${colors.magenta(`${runCommand} develop`)}
   `)
 
   reporter.info(`See all commands at\n
-  ${c.blueBright(`https://www.gatsbyjs.com/docs/gatsby-cli/`)}
+  ${colors.blueBright(`https://www.gatsbyjs.com/docs/gatsby-cli/`)}
   `)
 
   const siteHash = md5(fullPath)
