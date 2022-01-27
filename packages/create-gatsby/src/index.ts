@@ -7,7 +7,6 @@ import { initStarter, getPackageManager, gitSetup } from "./init-starter"
 import { installPlugins } from "./install-plugins"
 import c from "ansi-colors"
 import path from "path"
-import fs from "fs"
 import { plugin } from "./components/plugin"
 import { makePluginConfigQuestions } from "./plugin-options-form"
 import { center, wrap } from "./components/utils"
@@ -17,6 +16,8 @@ import crypto from "crypto"
 import { reporter } from "./reporter"
 import { setSiteMetadata } from "./site-metadata"
 import { makeNpmSafe } from "./utils"
+import { parseArgs } from "./parse-args"
+import { validateProjectName, generateQuestions } from "./questions"
 
 const sha256 = (str: string): string =>
   crypto.createHash(`sha256`).update(str).digest(`hex`)
@@ -29,95 +30,11 @@ const md5 = (str: string): string =>
  */
 const w = (input: string): string => (process.platform === `win32` ? `` : input)
 
-// eslint-disable-next-line no-control-regex
-const INVALID_FILENAMES = /[<>:"/\\|?*\u0000-\u001F]/g
-const INVALID_WINDOWS = /^(con|prn|aux|nul|com\d|lpt\d)$/i
-
 const DEFAULT_STARTERS: Record<keyof typeof language, string> = {
   js: `https://github.com/gatsbyjs/gatsby-starter-minimal.git`,
   ts: `https://github.com/gatsbyjs/gatsby-starter-minimal-ts.git`, // TODO - Create
 }
 
-const makeChoices = (
-  options: Record<string, { message: string; dependencies?: Array<string> }>,
-  mustSelect = false
-): Array<{ message: string; name: string; disabled?: boolean }> => {
-  const entries = Object.entries(options).map(([name, message]) => {
-    return { name, message: message.message }
-  })
-
-  if (mustSelect) {
-    return entries
-  }
-
-  const none = { name: `none`, message: `No (or I'll add it later)` }
-  const divider = { name: `–`, role: `separator`, message: `–` }
-
-  return [none, divider, ...entries]
-}
-
-export const validateProjectName = async (
-  value: string
-): Promise<string | boolean> => {
-  if (!value) {
-    return `You have not provided a directory name for your site. Please do so when running with the 'y' flag.`
-  }
-  value = value.trim()
-  if (INVALID_FILENAMES.test(value)) {
-    return `The destination "${value}" is not a valid filename. Please try again, avoiding special characters.`
-  }
-  if (process.platform === `win32` && INVALID_WINDOWS.test(value)) {
-    return `The destination "${value}" is not a valid Windows filename. Please try another name`
-  }
-  if (fs.existsSync(path.resolve(value))) {
-    return `The destination "${value}" already exists. Please choose a different name`
-  }
-  return true
-}
-
-// The enquirer types are not accurate
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const questions = (initialFolderName: string, skip: boolean): any => [
-  {
-    type: `textinput`,
-    name: `project`,
-    message: `What would you like to name the folder where your site will be created?`,
-    hint: path.basename(process.cwd()),
-    separator: `/`,
-    initial: initialFolderName,
-    format: (value: string): string => c.cyan(value),
-    validate: validateProjectName,
-    skip,
-  },
-  {
-    type: `selectinput`,
-    name: `language`,
-    message: `Will you be using JavaScript or TypeScript?`,
-    hint: `(Single choice) Arrow keys to move, enter to confirm`,
-    choices: makeChoices(language, true),
-  },
-  {
-    type: `selectinput`,
-    name: `cms`,
-    message: `Will you be using a CMS?`,
-    hint: `(Single choice) Arrow keys to move, enter to confirm`,
-    choices: makeChoices(cmses),
-  },
-  {
-    type: `selectinput`,
-    name: `styling`,
-    message: `Would you like to install a styling system?`,
-    hint: `(Single choice) Arrow keys to move, enter to confirm`,
-    choices: makeChoices(styles),
-  },
-  {
-    type: `multiselectinput`,
-    name: `features`,
-    message: `Would you like to install additional features with other plugins?`,
-    hint: `(Multiple choice) Use arrow keys to move, spacebar to select, and confirm with an enter on "Done"`,
-    choices: makeChoices(features, true),
-  },
-]
 interface IAnswers {
   name: string
   project: string
@@ -154,55 +71,12 @@ export type PluginMap = Record<string, IPluginEntry>
 
 export type PluginConfigMap = Record<string, Record<string, unknown>>
 
-const removeKey = (plugin: string): string => plugin.split(`:`)[0]
-
-interface IArgs {
+export interface IArgs {
   flags: {
     yes: boolean
     ts: boolean
   }
   siteDirectory: string
-}
-
-/**
- * Parse arguments without considering position. Both cases should work the same:
- * - `npm init gatsby hello-world -y`
- * - `npm init gatsby -y hello-world`
- */
-export function parseArgs(args: Array<string>): IArgs {
-  const { flags, siteDirectory } = args.reduce(
-    (sortedArgs, arg) => {
-      switch (arg) {
-        case `-y`:
-          sortedArgs.flags.yes = true
-          break
-        case `-tsc`:
-          sortedArgs.flags.ts = true
-          break
-        default:
-          if (arg.startsWith(`-`)) {
-            reporter.warn(
-              c.yellow(`Found unknown argument "${arg}", ignoring.`)
-            )
-            break
-          }
-          sortedArgs.siteDirectory = arg
-      }
-      return sortedArgs
-    },
-    {
-      flags: {
-        yes: false,
-        ts: false,
-      },
-      siteDirectory: ``,
-    }
-  )
-
-  return {
-    flags,
-    siteDirectory,
-  }
 }
 
 export async function run(): Promise<void> {
@@ -252,7 +126,9 @@ ${center(c.blueBright.bold.underline(`Welcome to Gatsby!`))}
       format: (value: string): string => c.cyan(value),
     } as any))
 
-    data = await enquirer.prompt(questions(makeNpmSafe(siteName), flags.yes))
+    data = await enquirer.prompt(
+      generateQuestions(makeNpmSafe(siteName), flags.yes)
+    )
   } else {
     const warn = await validateProjectName(siteDirectory)
     if (typeof warn === `string`) {
@@ -261,7 +137,7 @@ ${center(c.blueBright.bold.underline(`Welcome to Gatsby!`))}
     }
     siteName = siteDirectory
     data = await enquirer.prompt(
-      questions(makeNpmSafe(siteDirectory), flags.yes)[0]
+      generateQuestions(makeNpmSafe(siteDirectory), flags.yes)[0]
     )
   }
 
@@ -402,7 +278,7 @@ ${c.bold(`Thanks! Here's what we'll now do:`)}
   await initStarter(
     DEFAULT_STARTERS[data.language || `js`],
     data.project,
-    packages.map(removeKey),
+    packages.map((plugin: string) => plugin.split(`:`)[0]),
     siteName
   )
 

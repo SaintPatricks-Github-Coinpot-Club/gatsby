@@ -1,4 +1,4 @@
-import { parseArgs } from "../index"
+import { parseArgs } from "../parse-args"
 import { reporter } from "../reporter"
 
 jest.mock(`../reporter`)
